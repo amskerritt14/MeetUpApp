@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { format, eachDayOfInterval, parseISO, getDay } from 'date-fns'
@@ -18,7 +18,6 @@ interface Event {
 
 export default function EventPage() {
   const params = useParams()
-  const router = useRouter()
   const token = params.token as string
 
   const [event, setEvent] = useState<Event | null>(null)
@@ -72,17 +71,13 @@ export default function EventPage() {
       const updated = current.includes(window)
         ? current.filter(w => w !== window)
         : [...current, window]
-      return { ...prev, [dateStr]: updated }
-    })
-  }
-
-  function toggleDate(dateStr: string) {
-    setSelectedDates(prev => {
-      if (prev[dateStr] !== undefined) {
-        const { [dateStr]: _, ...rest } = prev
+      // if no windows selected, remove the date entirely
+      if (updated.length === 0) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { [dateStr]: _removed, ...rest } = prev
         return rest
       }
-      return { ...prev, [dateStr]: [] }
+      return { ...prev, [dateStr]: updated }
     })
   }
 
@@ -122,7 +117,7 @@ export default function EventPage() {
       <main className="flex flex-col items-center justify-center min-h-screen px-6 text-center">
         <div className="text-4xl mb-3">🤔</div>
         <h1 className="text-xl font-bold mb-2" style={{ color: 'var(--forest)' }}>Event not found</h1>
-        <p style={{ color: 'var(--stone-light)' }}>That link doesn't look right.</p>
+        <p style={{ color: 'var(--stone-light)' }}>That link doesn&apos;t look right.</p>
       </main>
     )
   }
@@ -198,7 +193,7 @@ export default function EventPage() {
       <div className="flex-1 px-4 py-6 max-w-md mx-auto w-full">
         <h2 className="text-xl font-bold mb-1" style={{ color: 'var(--forest)' }}>When are you free?</h2>
         <p className="text-sm mb-5" style={{ color: 'var(--stone-light)' }}>
-          Tap a day to select it, then choose your time windows.
+          Tap the time windows you&apos;re free — select as many as you like.
         </p>
 
         {error && (
@@ -224,8 +219,8 @@ export default function EventPage() {
 
           {eligibleDays.map(day => {
             const dateStr = format(day, 'yyyy-MM-dd')
-            const isSelected = dateStr in selectedDates
             const selectedWindows = selectedDates[dateStr] || []
+            const isSelected = selectedWindows.length > 0
 
             return (
               <div
@@ -233,12 +228,8 @@ export default function EventPage() {
                 className="card"
                 style={{ borderLeft: isSelected ? '4px solid var(--forest)' : '4px solid transparent' }}
               >
-                <button
-                  type="button"
-                  onClick={() => toggleDate(dateStr)}
-                  className="w-full flex items-center justify-between"
-                >
-                  <div className="text-left">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
                     <p className="font-semibold" style={{ color: 'var(--forest)' }}>
                       {format(day, 'EEEE')}
                     </p>
@@ -246,39 +237,30 @@ export default function EventPage() {
                       {format(day, 'd MMMM yyyy')}
                     </p>
                   </div>
-                  <span
-                    className="w-6 h-6 rounded-full flex items-center justify-center text-sm"
-                    style={{
-                      background: isSelected ? 'var(--forest)' : 'var(--cream)',
-                      color: isSelected ? 'white' : 'var(--stone-light)',
-                      border: '2px solid',
-                      borderColor: isSelected ? 'var(--forest)' : '#e5e2dc',
-                    }}
-                  >
-                    {isSelected ? '✓' : '+'}
-                  </span>
-                </button>
-
-                {isSelected && (
-                  <div className="flex flex-wrap gap-2 mt-3 pt-3" style={{ borderTop: '1px solid #e5e2dc' }}>
-                    {event.time_windows.map(w => (
-                      <button
-                        key={w}
-                        type="button"
-                        onClick={() => toggleWindow(dateStr, w)}
-                        className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
-                        style={{
-                          background: selectedWindows.includes(w) ? 'var(--sand)' : 'var(--cream)',
-                          color: selectedWindows.includes(w) ? 'var(--stone)' : 'var(--stone-light)',
-                          border: '2px solid',
-                          borderColor: selectedWindows.includes(w) ? 'var(--sand)' : '#e5e2dc',
-                        }}
-                      >
-                        {w}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                  {isSelected && (
+                    <span className="text-xs font-medium px-2 py-1 rounded-full" style={{ background: 'var(--forest)', color: 'white' }}>
+                      ✓ Free
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {event.time_windows.map(w => (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => toggleWindow(dateStr, w)}
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+                      style={{
+                        background: selectedWindows.includes(w) ? 'var(--sand)' : 'var(--cream)',
+                        color: selectedWindows.includes(w) ? 'var(--stone)' : 'var(--stone-light)',
+                        border: '2px solid',
+                        borderColor: selectedWindows.includes(w) ? 'var(--sand)' : '#e5e2dc',
+                      }}
+                    >
+                      {w}
+                    </button>
+                  ))}
+                </div>
               </div>
             )
           })}

@@ -3,7 +3,6 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import Nav from '@/components/Nav'
 import CalendarView from '@/components/CalendarView'
-import Recommendation from '@/components/Recommendation'
 
 export default async function CalendarPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
@@ -39,13 +38,9 @@ export default async function CalendarPage({ params }: { params: Promise<{ token
           {uniqueRespondents} friend{uniqueRespondents !== 1 ? 's' : ''} responded
         </p>
 
-        <Recommendation availability={availability || []} event={event} />
-
         <CalendarView
           availability={availability || []}
           event={event}
-          dateStart={event.date_start}
-          dateEnd={event.date_end}
         />
       </main>
     </div>

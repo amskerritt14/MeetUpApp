@@ -1,122 +1,206 @@
 'use client'
-
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
-  format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval,
-  startOfWeek, endOfWeek, isSameMonth, isSameDay, addMonths, subMonths,
-  getDay, eachWeekOfInterval,
+  format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, parseISO,
+  addMonths, subMonths, startOfWeek, endOfWeek, isSameMonth, addWeeks, subWeeks, addDays, subDays,
 } from 'date-fns'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import Recommendation from './Recommendation'
 
-interface AvailabilityRow {
+interface AvailabilityEntry {
   first_name: string
   available_date: string
   time_windows: string[]
 }
 
-interface Event {
-  date_start: string
-  date_end: string
-  days_of_week: number[]
-  time_windows: string[]
+interface CalendarViewProps {
+  event: {
+    id: string
+    name: string
+    date_start: string
+    date_end: string
+    days_of_week: number[]
+    time_windows: string[]
+  }
+  availability: AvailabilityEntry[]
 }
 
-interface Props {
-  availability: AvailabilityRow[]
-  event: Event
-  dateStart: string
-  dateEnd: string
-}
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-type ViewMode = 'month' | 'week' | 'day'
-
-export default function CalendarView({ availability, event }: Props) {
-  const [viewMode, setViewMode] = useState<ViewMode>('month')
+export default function CalendarView({ event, availability }: CalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(() => parseISO(event.date_start))
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [view, setView] = useState<'month' | 'week' | 'day'>('month')
 
-  const countsByDate: Record<string, string[]> = {}
-  const windowsByDate: Record<string, Record<string, string[]>> = {}
+  const byDate = useMemo(() => {
+    const map: Record<string, AvailabilityEntry[]> = {}
+    availability.forEach(a => {
+      if (!map[a.available_date]) map[a.available_date] = []
+      map[a.available_date].push(a)
+    })
+    return map
+  }, [availability])
 
-  for (const row of availability) {
-    if (!countsByDate[row.available_date]) countsByDate[row.available_date] = []
-    if (!countsByDate[row.available_date].includes(row.first_name)) {
-      countsByDate[row.available_date].push(row.first_name)
-    }
-    if (!windowsByDate[row.available_date]) windowsByDate[row.available_date] = {}
-    for (const w of row.time_windows) {
-      if (!windowsByDate[row.available_date][w]) windowsByDate[row.available_date][w] = []
-      if (!windowsByDate[row.available_date][w].includes(row.first_name)) {
-        windowsByDate[row.available_date][w].push(row.first_name)
-      }
-    }
-  }
+  const totalRespondents = useMemo(() =>
+    new Set(availability.map(a => a.first_name)).size
+  , [availability])
 
-  const totalRespondents = new Set(availability.map(a => a.first_name)).size
-
-  function isEligibleDay(date: Date) {
+  function isEventDay(date: Date) {
     return event.days_of_week.includes(getDay(date))
   }
 
-  function DayCell({ date, mini = false }: { date: Date; mini?: boolean }) {
+  function navigate(dir: 1 | -1) {
+    if (view === 'month') setCurrentDate(d => dir === 1 ? addMonths(d, 1) : subMonths(d, 1))
+    if (view === 'week') setCurrentDate(d => dir === 1 ? addWeeks(d, 1) : subWeeks(d, 1))
+    if (view === 'day') setCurrentDate(d => dir === 1 ? addDays(d, 1) : subDays(d, 1))
+  }
+
+  function navLabel() {
+    if (view === 'month') return format(currentDate, 'MMMM yyyy')
+    if (view === 'week') {
+      const ws = startOfWeek(currentDate, { weekStartsOn: 0 })
+      const we = endOfWeek(currentDate, { weekStartsOn: 0 })
+      return `${format(ws, 'd MMM')} – ${format(we, 'd MMM yyyy')}`
+    }
+    return format(currentDate, 'EEEE, d MMMM yyyy')
+  }
+
+  // Shared day cell used in month + week views
+  function DayCell({ date, tall = true }: { date: Date; tall?: boolean }) {
     const dateStr = format(date, 'yyyy-MM-dd')
-    const count = countsByDate[dateStr]?.length ?? 0
-    const isInMonth = isSameMonth(date, currentDate)
+    const inMonth = view === 'week' ? true : isSameMonth(date, currentDate)
+    const isEvent = isEventDay(date)
+    const entries = byDate[dateStr] || []
+    const uniqueHere = new Set(entries.map(e => e.first_name)).size
     const isSelected = selectedDate === dateStr
-    const eligible = isEligibleDay(date)
+
+    function handleClick() {
+      if (isEvent && inMonth) setSelectedDate(isSelected ? null : dateStr)
+    }
 
     return (
-      <button
-        onClick={() => eligible && count > 0 ? setSelectedDate(isSelected ? null : dateStr) : null}
-        className="w-full flex flex-col items-center py-1 rounded-lg transition-colors"
+      <div
+        onClick={handleClick}
         style={{
-          opacity: isInMonth ? 1 : 0.3,
-          background: isSelected ? 'var(--forest)' : eligible && count > 0 ? '#f0f7f3' : 'transparent',
-          cursor: eligible && count > 0 ? 'pointer' : 'default',
-          minHeight: mini ? undefined : '4rem',
+          minHeight: tall ? '70px' : '56px',
+          padding: '6px',
+          borderRadius: '10px',
+          background: isSelected ? '#1E3A28' : isEvent && inMonth ? 'white' : '#f0f0f0',
+          color: isSelected ? 'white' : inMonth ? '#333' : '#bbb',
+          cursor: isEvent && inMonth ? 'pointer' : 'default',
+          boxShadow: isSelected ? '0 2px 8px rgba(30,58,40,0.3)' : isEvent && inMonth ? '0 1px 4px rgba(0,0,0,0.06)' : 'none',
+          transition: 'all 0.15s',
+          border: isSelected ? '2px solid #C8A87A' : '2px solid transparent',
         }}
       >
-        <span
-          className="text-xs font-medium mb-0.5"
-          style={{ color: isSelected ? 'white' : eligible ? 'var(--forest)' : 'var(--stone-light)' }}
-        >
-          {format(date, 'd')}
-        </span>
-        {eligible && count > 0 && (
-          <span
-            className="text-xs font-bold px-1.5 py-0.5 rounded-full"
-            style={{
-              background: isSelected ? 'var(--sand)' : 'var(--forest)',
-              color: isSelected ? 'var(--stone)' : 'white',
-              fontSize: '0.6rem',
-            }}
-          >
-            {count}/{totalRespondents}
-          </span>
+        <div style={{ fontSize: '0.8rem', fontWeight: '600', marginBottom: '4px' }}>
+          {view === 'week' ? (
+            <span>{DAY_NAMES[getDay(date)]} {format(date, 'd')}</span>
+          ) : (
+            format(date, 'd')
+          )}
+        </div>
+        {isEvent && inMonth && (
+          <div style={{
+            fontSize: '0.65rem',
+            background: isSelected ? 'rgba(200,168,122,0.3)' : uniqueHere > 0 ? '#e8f5e9' : '#f5f5f5',
+            color: isSelected ? '#C8A87A' : uniqueHere > 0 ? '#2e7d32' : '#999',
+            borderRadius: '6px',
+            padding: '2px 4px',
+            fontWeight: '600',
+          }}>
+            {uniqueHere > 0 ? `${uniqueHere}/${totalRespondents} free` : 'No responses'}
+          </div>
         )}
-      </button>
+      </div>
     )
   }
 
-  function MonthView() {
+  // Pre-compute days for month and week views at the top level (to avoid hook-in-condition issues)
+  const monthDays = useMemo(() => {
     const monthStart = startOfMonth(currentDate)
     const monthEnd = endOfMonth(currentDate)
-    const weeks = eachWeekOfInterval(
-      { start: startOfWeek(monthStart), end: endOfWeek(monthEnd) },
-      { weekStartsOn: 0 }
-    )
+    return eachDayOfInterval({
+      start: startOfWeek(monthStart, { weekStartsOn: 0 }),
+      end: endOfWeek(monthEnd, { weekStartsOn: 0 }),
+    })
+  }, [currentDate])
+
+  const weekDays = useMemo(() => {
+    const ws = startOfWeek(currentDate, { weekStartsOn: 0 })
+    return eachDayOfInterval({ start: ws, end: endOfWeek(ws, { weekStartsOn: 0 }) })
+  }, [currentDate])
+
+  // Month grid
+  function MonthGrid() {
+    const days = monthDays
 
     return (
-      <div>
-        <div className="grid grid-cols-7 mb-1">
-          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-            <div key={i} className="text-center text-xs font-medium py-1" style={{ color: 'var(--stone-light)' }}>{d}</div>
+      <>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '4px' }}>
+          {DAY_NAMES.map(d => (
+            <div key={d} style={{ textAlign: 'center', fontSize: '0.75rem', fontWeight: '600', color: '#888', padding: '4px 0' }}>{d}</div>
           ))}
         </div>
-        {weeks.map((weekStart, wi) => {
-          const days = eachDayOfInterval({ start: weekStart, end: endOfWeek(weekStart, { weekStartsOn: 0 }) })
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
+          {days.map(date => <DayCell key={format(date, 'yyyy-MM-dd')} date={date} />)}
+        </div>
+      </>
+    )
+  }
+
+  // Week view — horizontal grid, one column per day, names listed inside
+  function WeekGrid() {
+    const days = weekDays
+
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
+        {days.map(date => {
+          const dateStr = format(date, 'yyyy-MM-dd')
+          const isEvent = isEventDay(date)
+          const entries = byDate[dateStr] || []
+          const uniqueNames = [...new Set(entries.map(e => e.first_name))]
+
           return (
-            <div key={wi} className="grid grid-cols-7 gap-0.5 mb-0.5">
-              {days.map((day, di) => <DayCell key={di} date={day} />)}
+            <div
+              key={dateStr}
+              style={{
+                background: isEvent ? 'white' : '#f0f0f0',
+                borderRadius: '10px',
+                padding: '8px 6px',
+                boxShadow: isEvent ? '0 1px 4px rgba(0,0,0,0.06)' : 'none',
+                minHeight: '120px',
+              }}
+            >
+              <p style={{ fontSize: '0.7rem', fontWeight: '700', color: isEvent ? '#1E3A28' : '#bbb', marginBottom: '2px' }}>
+                {format(date, 'EEE')}
+              </p>
+              <p style={{ fontSize: '0.75rem', color: '#888', marginBottom: '6px' }}>{format(date, 'd')}</p>
+
+              {isEvent && (
+                <>
+                  <div style={{
+                    fontSize: '0.6rem', fontWeight: '700', padding: '2px 4px', borderRadius: '6px', marginBottom: '6px',
+                    background: uniqueNames.length > 0 ? '#e8f5e9' : '#f5f5f5',
+                    color: uniqueNames.length > 0 ? '#2e7d32' : '#999',
+                  }}>
+                    {uniqueNames.length}/{totalRespondents}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {uniqueNames.map(name => {
+                      const windows = [...new Set(entries.filter(e => e.first_name === name).flatMap(e => e.time_windows))]
+                      return (
+                        <div key={name} title={windows.join(', ')} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#1E3A28', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '0.6rem', flexShrink: 0 }}>
+                            {name.charAt(0).toUpperCase()}
+                          </div>
+                          <p style={{ fontSize: '0.65rem', color: '#333', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</p>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           )
         })}
@@ -124,134 +208,132 @@ export default function CalendarView({ availability, event }: Props) {
     )
   }
 
-  function WeekView() {
-    const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 })
-    const days = eachDayOfInterval({ start: weekStart, end: endOfWeek(weekStart, { weekStartsOn: 0 }) })
-    return (
-      <div className="grid grid-cols-7 gap-1">
-        {days.map((day, i) => (
-          <div key={i} className="flex flex-col items-center">
-            <p className="text-xs mb-1" style={{ color: 'var(--stone-light)' }}>{format(day, 'EEE')}</p>
-            <DayCell date={day} mini />
-          </div>
-        ))}
-      </div>
-    )
-  }
-
-  function DayView() {
+  // Single day
+  function DayDetail() {
     const dateStr = format(currentDate, 'yyyy-MM-dd')
-    const names = countsByDate[dateStr] || []
-    const windows = windowsByDate[dateStr] || {}
+    const entries = byDate[dateStr] || []
+    const isEvent = isEventDay(currentDate)
+
+    if (!isEvent) {
+      return (
+        <div style={{ background: '#f5f5f5', borderRadius: '14px', padding: '24px', textAlign: 'center', color: '#888' }}>
+          Not an event day.
+        </div>
+      )
+    }
+
+    if (entries.length === 0) {
+      return (
+        <div style={{ background: 'white', borderRadius: '14px', padding: '24px', textAlign: 'center', color: '#888', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+          No responses yet for this day.
+        </div>
+      )
+    }
+
+    const uniqueNames = [...new Set(entries.map(e => e.first_name))]
 
     return (
-      <div className="card">
-        <p className="font-bold mb-3" style={{ color: 'var(--forest)' }}>
-          {format(currentDate, 'EEEE, d MMMM yyyy')}
+      <div style={{ background: 'white', borderRadius: '14px', padding: '20px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        <p style={{ fontWeight: '700', color: '#1E3A28', marginBottom: '4px' }}>
+          {uniqueNames.length}/{totalRespondents} free
         </p>
-        {names.length === 0 ? (
-          <p className="text-sm" style={{ color: 'var(--stone-light)' }}>Nobody marked this day yet.</p>
-        ) : (
-          <>
-            <p className="text-sm mb-3" style={{ color: 'var(--stone-light)' }}>
-              <strong style={{ color: 'var(--fern)' }}>{names.length}</strong> of {totalRespondents} free: {names.join(', ')}
-            </p>
-            {event.time_windows.map(w => (
-              <div key={w} className="mb-2">
-                <p className="text-xs font-semibold uppercase mb-1" style={{ color: 'var(--stone-light)' }}>{w}</p>
-                <p className="text-sm" style={{ color: 'var(--stone)' }}>
-                  {windows[w]?.join(', ') || <span style={{ color: 'var(--stone-light)' }}>None</span>}
-                </p>
-              </div>
-            ))}
-          </>
-        )}
+        <p style={{ fontSize: '0.85rem', color: '#888', marginBottom: '16px' }}>{uniqueNames.join(', ')}</p>
+        {event.time_windows.map(w => {
+          const free = [...new Set(entries.filter(e => e.time_windows.includes(w)).map(e => e.first_name))]
+          return (
+            <div key={w} style={{ marginBottom: '12px' }}>
+              <p style={{ fontSize: '0.75rem', fontWeight: '700', color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>{w}</p>
+              {free.length === 0 ? (
+                <p style={{ fontSize: '0.85rem', color: '#bbb' }}>None</p>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {free.map(name => (
+                    <span key={name} style={{ fontSize: '0.8rem', padding: '3px 10px', borderRadius: '9999px', background: '#e8f5e9', color: '#1E3A28', fontWeight: '600' }}>
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
     )
   }
 
-  const selectedDetails = selectedDate ? {
-    names: countsByDate[selectedDate] || [],
-    windows: windowsByDate[selectedDate] || {},
-  } : null
+  // Shared selected date detail panel (month + week views)
+  const selectedEntries = selectedDate ? (byDate[selectedDate] || []) : []
+  const uniqueOnSelected = selectedDate ? new Set(selectedEntries.map(e => e.first_name)).size : 0
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <button
-          onClick={() => viewMode === 'month' ? setCurrentDate(subMonths(currentDate, 1)) : setCurrentDate(new Date(currentDate.getTime() - (viewMode === 'week' ? 7 : 1) * 86400000))}
-          className="p-2 rounded-lg"
-          style={{ background: 'white', border: '1px solid #e5e2dc' }}
-        >
-          ‹
-        </button>
-        <div className="text-center">
-          <p className="font-bold" style={{ color: 'var(--forest)' }}>
-            {viewMode === 'month' ? format(currentDate, 'MMMM yyyy') :
-             viewMode === 'week' ? `Week of ${format(startOfWeek(currentDate), 'd MMM')}` :
-             format(currentDate, 'd MMMM yyyy')}
-          </p>
-        </div>
-        <button
-          onClick={() => viewMode === 'month' ? setCurrentDate(addMonths(currentDate, 1)) : setCurrentDate(new Date(currentDate.getTime() + (viewMode === 'week' ? 7 : 1) * 86400000))}
-          className="p-2 rounded-lg"
-          style={{ background: 'white', border: '1px solid #e5e2dc' }}
-        >
-          ›
-        </button>
-      </div>
-
-      <div className="flex gap-1 mb-4 p-1 rounded-xl" style={{ background: 'white', border: '1px solid #e5e2dc' }}>
-        {(['month', 'week', 'day'] as ViewMode[]).map(mode => (
+      {/* View toggle */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+        {(['month', 'week', 'day'] as const).map(v => (
           <button
-            key={mode}
-            onClick={() => setViewMode(mode)}
-            className="flex-1 py-1.5 rounded-lg text-sm font-medium capitalize transition-colors"
+            key={v}
+            onClick={() => setView(v)}
             style={{
-              background: viewMode === mode ? 'var(--forest)' : 'transparent',
-              color: viewMode === mode ? 'white' : 'var(--stone-light)',
+              padding: '8px 18px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+              fontWeight: view === v ? '700' : '400',
+              background: view === v ? '#1E3A28' : '#e8e8e8',
+              color: view === v ? 'white' : '#333',
+              fontSize: '0.9rem',
             }}
           >
-            {mode}
+            {v.charAt(0).toUpperCase() + v.slice(1)}
           </button>
         ))}
       </div>
 
-      <div className="card mb-4">
-        {viewMode === 'month' && <MonthView />}
-        {viewMode === 'week' && <WeekView />}
-        {viewMode === 'day' && <DayView />}
+      {/* Nav */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px' }}>
+          <ChevronLeft size={20} color="#1E3A28" />
+        </button>
+        <h3 style={{ fontWeight: '700', color: '#1E3A28', fontSize: '1rem' }}>{navLabel()}</h3>
+        <button onClick={() => navigate(1)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px' }}>
+          <ChevronRight size={20} color="#1E3A28" />
+        </button>
       </div>
 
-      {selectedDetails && selectedDate && (
-        <div className="card" style={{ borderLeft: '4px solid var(--fern)' }}>
-          <div className="flex items-center justify-between mb-2">
-            <p className="font-bold" style={{ color: 'var(--forest)' }}>
-              {format(parseISO(selectedDate), 'EEEE, d MMMM')}
-            </p>
-            <button onClick={() => setSelectedDate(null)} style={{ color: 'var(--stone-light)' }}>✕</button>
+      {/* Views */}
+      {view === 'month' && MonthGrid()}
+      {view === 'week' && WeekGrid()}
+      {view === 'day' && DayDetail()}
+
+      {/* Selected date detail (month + week only) */}
+      {view !== 'day' && selectedDate && (
+        <div style={{ marginTop: '24px', background: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h4 style={{ fontWeight: '700', color: '#1E3A28', fontSize: '1rem' }}>
+              {format(parseISO(selectedDate), 'EEEE, d MMMM')} — {uniqueOnSelected}/{totalRespondents} free
+            </h4>
+            <button onClick={() => setSelectedDate(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888', fontSize: '1.1rem' }}>✕</button>
           </div>
-          <p className="text-sm mb-3" style={{ color: 'var(--stone-light)' }}>
-            <strong style={{ color: 'var(--fern)' }}>{selectedDetails.names.length}</strong> of {totalRespondents} free:{' '}
-            {selectedDetails.names.join(', ')}
-          </p>
-          {event.time_windows.map(w => (
-            <div key={w} className="mb-2">
-              <p className="text-xs font-semibold uppercase mb-1" style={{ color: 'var(--stone-light)' }}>{w}</p>
-              <div className="flex flex-wrap gap-1">
-                {selectedDetails.windows[w]?.length > 0
-                  ? selectedDetails.windows[w].map(name => (
-                      <span key={name} className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'var(--cream)', color: 'var(--stone)' }}>
-                        {name}
-                      </span>
-                    ))
-                  : <span className="text-xs" style={{ color: 'var(--stone-light)' }}>None</span>
-                }
-              </div>
+          {selectedEntries.length === 0 ? (
+            <p style={{ color: '#888' }}>No responses yet for this day.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {selectedEntries.map((entry, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: '#f8f8f8', borderRadius: '10px' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#1E3A28', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '0.85rem', flexShrink: 0 }}>
+                    {entry.first_name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: '600', color: '#333', fontSize: '0.9rem' }}>{entry.first_name}</div>
+                    <div style={{ fontSize: '0.8rem', color: '#888' }}>{entry.time_windows.join(', ')}</div>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       )}
+
+      <div style={{ marginTop: '24px' }}>
+        <Recommendation availability={availability} />
+      </div>
     </div>
   )
 }

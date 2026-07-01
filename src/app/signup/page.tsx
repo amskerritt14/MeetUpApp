@@ -47,8 +47,9 @@ export default function SignupPage() {
           )}
           <form onSubmit={handleSignup} className="flex flex-col gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">First name</label>
+              <label htmlFor="first-name" className="block text-sm font-medium mb-1">First name</label>
               <input
+                id="first-name"
                 type="text"
                 value={firstName}
                 onChange={e => setFirstName(e.target.value)}
@@ -58,8 +59,9 @@ export default function SignupPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Email</label>
+              <label htmlFor="email" className="block text-sm font-medium mb-1">Email</label>
               <input
+                id="email"
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
@@ -69,8 +71,9 @@ export default function SignupPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Password</label>
+              <label htmlFor="password" className="block text-sm font-medium mb-1">Password</label>
               <input
+                id="password"
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
