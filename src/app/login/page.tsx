@@ -33,7 +33,10 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
     const supabase = createClient()
-    const { error } = await supabase.auth.signInWithOtp({ email })
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    })
     if (error) { setError(error.message) } else { setMagicSent(true) }
     setLoading(false)
   }
@@ -77,7 +80,10 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label htmlFor="password" className="block text-sm font-medium mb-1">Password</label>
+              <div className="flex items-center justify-between mb-1">
+                <label htmlFor="password" className="text-sm font-medium">Password</label>
+                <Link href="/auth/reset" className="text-xs" style={{ color: 'var(--fern)' }}>Forgot password?</Link>
+              </div>
               <input
                 id="password"
                 type="password"
