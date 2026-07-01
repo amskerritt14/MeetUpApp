@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+:root {
+  --forest: #1E3A28;
+  --fern: #3A6648;
+  --sand: #C8A87A;
+  --cream: #F6F4F0;
+  --stone: #2A2820;
+  --stone-light: #6B6860;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background-color: var(--cream);
+  color: var(--stone);
+}
+
+.btn-primary {
+  background-color: var(--forest);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  display: inline-block;
+  text-align: center;
+  text-decoration: none;
+}
+
+.btn-primary:hover { opacity: 0.9; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-secondary {
+  background-color: transparent;
+  color: var(--forest);
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  border: 2px solid var(--forest);
+  cursor: pointer;
+  transition: all 0.15s;
+  display: inline-block;
+  text-align: center;
+  text-decoration: none;
+}
+
+.btn-secondary:hover { background-color: var(--forest); color: white; }
+
+.card {
+  background: white;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 2px solid #e5e2dc;
+  border-radius: 0.75rem;
+  font-size: 1rem;
+  background: white;
+  color: var(--stone);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.input:focus { border-color: var(--forest); }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--forest);
+  color: white;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 0.4rem;
+}
+
+.badge-sand { background-color: var(--sand); color: var(--stone); }
